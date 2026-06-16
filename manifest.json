@@ -1,0 +1,16 @@
+{
+  "name": "Dino Run",
+  "short_name": "Dino Run",
+  "description": "Chrome Dino style game with Easy, Medium and Hard modes",
+  "start_url": "dino-run.html",
+  "display": "standalone",
+  "background_color": "#f6ead9",
+  "theme_color": "#f6ead9",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦖</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

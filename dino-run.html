@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="application-name" content="Dino Run">
+<meta name="theme-color" content="#f6ead9">
+<link rel="manifest" href="manifest.json">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dino Run</title>
+<style>
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background: linear-gradient(180deg,#f6ead9 0%, #ece1cf 100%);
+    font-family: 'SF Mono','Menlo','Monaco','Courier New',Courier,monospace;
+    color:#3a3a3a;
+    padding:24px;
+  }
+  .app{
+    position:relative;
+    width:640px;
+    max-width:100%;
+    background:#f7f7f7;
+    border:1px solid #d8d3c8;
+    border-radius:14px;
+    box-shadow:0 18px 50px rgba(80,60,30,0.18);
+    overflow:hidden;
+  }
+  .screen{
+    display:none;
+    flex-direction:column;
+    padding:28px 32px 24px;
+    min-height:430px;
+  }
+  .screen.active{ display:flex; }
+
+  /* HOME */
+  .home-header{ text-align:center; margin-bottom:20px; }
+  .logo{ font-size:28px; letter-spacing:4px; margin:0 0 6px; }
+  .tagline{ margin:0; color:#9a9388; font-size:14px; }
+
+  .level-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:12px;
+    margin-bottom:18px;
+  }
+  .level-card{
+    border:2px solid #3a3a3a;
+    background:#fff;
+    border-radius:10px;
+    padding:14px 8px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:6px;
+    cursor:pointer;
+    font-family:inherit;
+    transition: transform .12s ease, background .12s ease;
+  }
+  .level-card:hover{ transform: translateY(-3px); background:#fffaf3; }
+  .level-card:active{ transform: translateY(0px); }
+  .level-name{ font-size:16px; font-weight:700; letter-spacing:1px; }
+  .level-sub{ font-size:11px; color:#9a9388; text-align:center; }
+  .level-best{ font-size:11px; margin-top:4px; }
+  .level-best strong{ color:#ff5a36; }
+
+  .text-btn{
+    background:none; border:none; color:#9a9388; text-decoration:underline;
+    cursor:pointer; font-family:inherit; font-size:13px; margin:0 auto 18px; padding:4px;
+  }
+  .text-btn:hover{ color:#3a3a3a; }
+
+  .home-scene{ margin-top:auto; border-top:1px dashed #d8d3c8; padding-top:14px; }
+  #idle-canvas{ width:100%; height:auto; display:block; image-rendering:pixelated; }
+
+  /* INSTRUCTIONS */
+  #screen-instructions h2{ margin:0 0 14px; }
+  .instructions-body h3{ margin:14px 0 4px; font-size:13px; letter-spacing:2px; color:#ff5a36; text-transform:uppercase; }
+  .instructions-body p{ margin:0 0 4px; font-size:13px; line-height:1.6; color:#4a4540; }
+
+  /* GAME */
+  .hud{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .hud-group{ display:flex; flex-direction:column; min-width:70px; }
+  .hud-right{ align-items:flex-end; text-align:right; }
+  .hud-label{ font-size:10px; letter-spacing:2px; color:#9a9388; }
+  .hud-value{ font-size:18px; font-weight:700; }
+  .hud-level{ font-size:12px; letter-spacing:3px; color:#ff5a36; font-weight:700; }
+
+  .canvas-frame{ position:relative; border:2px solid #3a3a3a; border-radius:6px; overflow:hidden; transition: background .4s ease, border-color .4s ease; }
+  #game-canvas{ display:block; width:100%; height:auto; image-rendering:pixelated; background:#f7f7f7; touch-action:manipulation; }
+  .canvas-frame.night{ background:#202028; border-color:#202028; }
+
+  .banner{
+    position:absolute; top:10px; left:50%; transform:translateX(-50%);
+    background:#3a3a3a; color:#f7f7f7; font-size:12px; padding:6px 12px;
+    border-radius:20px; opacity:0; transition:opacity .3s ease; pointer-events:none; white-space:nowrap;
+  }
+  .banner.show{ opacity:1; }
+
+  .start-hint{
+    position:absolute; bottom:14px; left:50%; transform:translateX(-50%);
+    font-size:12px; color:#8a8378; background:rgba(247,247,247,0.85);
+    padding:4px 10px; border-radius:20px; pointer-events:none; transition:opacity .2s ease;
+  }
+  .start-hint.hidden{ opacity:0; }
+
+  .hud-best{ margin:10px 0 0; font-size:12px; color:#9a9388; text-align:center; }
+  .hud-best strong{ color:#3a3a3a; }
+
+  /* GAME OVER */
+  #screen-gameover h2{ margin:0 0 16px; text-align:center; }
+  .stats{ display:flex; justify-content:space-around; margin-bottom:12px; }
+  .stat{ display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .stat-label{ font-size:11px; letter-spacing:2px; color:#9a9388; }
+  .stat-value{ font-size:22px; font-weight:700; }
+  .new-best{ text-align:center; color:#ff5a36; font-weight:700; min-height:20px; opacity:0; transition:opacity .3s ease; }
+  .new-best.show{ opacity:1; }
+  .go-actions{ margin-top:auto; display:flex; justify-content:center; gap:12px; padding-top:18px; }
+  .primary-btn{
+    font-family:inherit; font-size:14px; font-weight:700; letter-spacing:1px;
+    padding:10px 24px; border-radius:8px; cursor:pointer; border:2px solid #ff5a36;
+    background:#ff5a36; color:#fff;
+  }
+  .primary-btn:hover{ background:#e0451f; }
+
+  /* HOME BUTTON */
+  .home-fab{
+    position:absolute; top:12px; left:12px; display:none; align-items:center; gap:4px;
+    font-family:inherit; font-size:12px; font-weight:700;
+    background:rgba(255,255,255,0.9); border:2px solid #3a3a3a;
+    border-radius:20px; padding:6px 12px; cursor:pointer; z-index:5;
+  }
+  .home-fab.visible{ display:flex; }
+  .home-fab:hover{ background:#fff; }
+
+  button:focus-visible{ outline:2px solid #ff5a36; outline-offset:2px; }
+
+  /* CONFETTI */
+  .confetti-layer{ position:fixed; inset:0; pointer-events:none; overflow:hidden; z-index:999; }
+  .confetti{ position:absolute; top:-10px; width:8px; height:14px; opacity:0.9; animation: confetti-fall linear forwards; }
+  @keyframes confetti-fall{ to{ transform: translateY(110vh) rotate(720deg); opacity:0.6; } }
+
+  @media (prefers-reduced-motion: reduce){
+    .confetti{ animation:none; opacity:0; }
+    .level-card{ transition:none; }
+  }
+
+  @media (max-width:480px){
+    .screen{ padding:18px 16px; }
+    .logo{ font-size:22px; }
+  }
+</style>
+</head>
+<body>
+  <div class="app" id="app">
+
+    <!-- HOME SCREEN -->
+    <section class="screen active" id="screen-home">
+      <header class="home-header">
+        <h1 class="logo">🦖 DINO RUN</h1>
+        <p class="tagline">Welcome! Pick a difficulty to start running.</p>
+      </header>
+
+      <div class="level-grid">
+        <button class="level-card" data-level="easy">
+          <span class="level-name">Easy</span>
+          <span class="level-sub">Gentle pace, wide gaps</span>
+          <span class="level-best">Best <strong id="best-easy">0</strong></span>
+        </button>
+        <button class="level-card" data-level="medium">
+          <span class="level-name">Medium</span>
+          <span class="level-sub">Quicker, occasional birds</span>
+          <span class="level-best">Best <strong id="best-medium">0</strong></span>
+        </button>
+        <button class="level-card" data-level="hard">
+          <span class="level-name">Hard</span>
+          <span class="level-sub">Fast &amp; tight, lots of birds</span>
+          <span class="level-best">Best <strong id="best-hard">0</strong></span>
+        </button>
+      </div>
+
+      <button class="text-btn" id="btn-instructions">How to play</button>
+
+      <div class="home-scene">
+        <canvas id="idle-canvas" width="600" height="90"></canvas>
+      </div>
+    </section>
+
+    <!-- INSTRUCTIONS SCREEN -->
+    <section class="screen" id="screen-instructions">
+      <h2>How to play</h2>
+      <div class="instructions-body">
+        <h3>Controls</h3>
+        <p><strong>Jump</strong> — press Space, the Up arrow, or click/tap the game.</p>
+        <p><strong>Duck</strong> — hold the Down arrow to slide under low-flying birds. Hold it while airborne to drop back down faster.</p>
+        <h3>Goal</h3>
+        <p>Survive as long as you can. Your score climbs the further you run, and the pace quickens the longer you last. Day will flip to night every so often — purely cosmetic, the challenge stays the same.</p>
+        <h3>Difficulty</h3>
+        <p><strong>Easy</strong> — slow start, wide gaps between obstacles, birds are rare.<br>
+        <strong>Medium</strong> — a brisker pace with tighter gaps and more frequent birds.<br>
+        <strong>Hard</strong> — fastest pace, the tightest gaps, and birds appear often.</p>
+        <h3>Scoring</h3>
+        <p>Each difficulty keeps its own separate high score. If you beat it mid-run, you'll get a quick notice — it won't affect your gameplay at all. Beat it for good and confetti will be waiting for you on the game over screen.</p>
+        <h3>Heads up</h3>
+        <p>Use the home button in the corner to return here anytime. If the game sits untouched for 5 minutes, it returns here on its own.</p>
+      </div>
+    </section>
+
+    <!-- GAME SCREEN -->
+    <section class="screen" id="screen-game">
+      <div class="hud">
+        <div class="hud-group">
+          <span class="hud-label">TIME</span>
+          <span class="hud-value" id="hud-time">00:00</span>
+        </div>
+        <div class="hud-group" style="align-items:center;">
+          <span class="hud-level" id="hud-level">EASY</span>
+        </div>
+        <div class="hud-group hud-right">
+          <span class="hud-label">SCORE</span>
+          <span class="hud-value" id="hud-score">00000</span>
+        </div>
+      </div>
+      <div class="canvas-frame">
+        <canvas id="game-canvas" width="600" height="200"></canvas>
+        <div class="banner" id="surpass-banner" aria-live="polite"></div>
+        <div class="start-hint" id="start-hint">Press Space, Up, or tap to start</div>
+      </div>
+      <p class="hud-best">Best for this level: <strong id="hud-best">0</strong></p>
+    </section>
+
+    <!-- GAME OVER SCREEN -->
+    <section class="screen" id="screen-gameover">
+      <h2>You died</h2>
+      <div class="stats">
+        <div class="stat"><span class="stat-label">SCORE</span><span class="stat-value" id="go-score">0</span></div>
+        <div class="stat"><span class="stat-label">HIGH SCORE</span><span class="stat-value" id="go-best">0</span></div>
+        <div class="stat"><span class="stat-label">TIME PLAYED</span><span class="stat-value" id="go-time">00:00</span></div>
+      </div>
+      <p class="new-best" id="go-new-best" aria-live="polite">🎉 New high score for this level!</p>
+      <div class="go-actions">
+        <button class="primary-btn" id="btn-retry">Run again</button>
+      </div>
+    </section>
+
+    <!-- GLOBAL HOME BUTTON -->
+    <button class="home-fab" id="btn-home" aria-label="Go to home screen">🏠 Home</button>
+  </div>
+
+  <div class="confetti-layer" id="confetti-layer"></div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ---------------- Config ---------------- */
+  var START_SPEED = 5.0; // every difficulty begins this slow, then ramps up at its own rate
+  var DIFFICULTIES = {
+    easy:   { label:'Easy',   startSpeed:START_SPEED, maxSpeed:10.0, accel:0.0014, minGap:300, maxGap:520, birdChance:0.06 },
+    medium: { label:'Medium', startSpeed:START_SPEED, maxSpeed:13.0, accel:0.0025, minGap:220, maxGap:420, birdChance:0.20 },
+    hard:   { label:'Hard',   startSpeed:START_SPEED, maxSpeed:16.5, accel:0.0040, minGap:150, maxGap:320, birdChance:0.36 }
+  };
+  var JUMP_VELOCITY = 9.5;
+  var GRAVITY = 0.46;
+  var FAST_DROP = 1.6;
+  var BIRD_FLY_HEIGHT = 32;
+  var BIRD_HEIGHT = 20;
+  var GROUND_Y = 170;
+  var DINO_X = 50;
+  var DINO_W = 48, DINO_H = 50, DUCK_W = 64, DUCK_H = 28;
+  var IDLE_TIMEOUT = 5 * 60 * 1000;
+  var HIGHSCORE_KEY = 'dinoRunHighScores';
+
+  var OBSTACLE_DIMS = {
+    cactusSmall:{ w:18, h:36, kind:'ground' },
+    cactusLarge:{ w:27, h:54, kind:'ground' },
+    cactusGroup:{ w:48, h:36, kind:'ground' },
+    bird:{ w:34, h:BIRD_HEIGHT, kind:'air' }
+  };
+
+  /* ---------------- Elements ---------------- */
+  var screens = {
+    home: document.getElementById('screen-home'),
+    instructions: document.getElementById('screen-instructions'),
+    game: document.getElementById('screen-game'),
+    gameover: document.getElementById('screen-gameover')
+  };
+  var homeBtn = document.getElementById('btn-home');
+  var canvas = document.getElementById('game-canvas');
+  var ctx = canvas.getContext('2d');
+  var canvasFrame = canvas.parentElement;
+  var idleCanvas = document.getElementById('idle-canvas');
+  var idleCtx = idleCanvas.getContext('2d');
+  var surpassBanner = document.getElementById('surpass-banner');
+  var startHint = document.getElementById('start-hint');
+  var hudTime = document.getElementById('hud-time');
+  var hudScore = document.getElementById('hud-score');
+  var hudLevel = document.getElementById('hud-level');
+  var hudBest = document.getElementById('hud-best');
+  var goScore = document.getElementById('go-score');
+  var goBest = document.getElementById('go-best');
+  var goTime = document.getElementById('go-time');
+  var goNewBest = document.getElementById('go-new-best');
+  var confettiLayer = document.getElementById('confetti-layer');
+
+  /* ---------------- High scores ---------------- */
+  var highScores = { easy:0, medium:0, hard:0 };
+  function loadHighScores(){
+    try{
+      var raw = localStorage.getItem(HIGHSCORE_KEY);
+      if(raw){
+        var parsed = JSON.parse(raw);
+        Object.keys(highScores).forEach(function(k){
+          if(typeof parsed[k] === 'number') highScores[k] = parsed[k];
+        });
+      }
+    }catch(e){ }
+  }
+  function saveHighScores(){
+    try{ localStorage.setItem(HIGHSCORE_KEY, JSON.stringify(highScores)); }catch(e){}
+  }
+  function refreshHomeBests(){
+    document.getElementById('best-easy').textContent = highScores.easy;
+    document.getElementById('best-medium').textContent = highScores.medium;
+    document.getElementById('best-hard').textContent = highScores.hard;
+  }
+
+  /* ---------------- Screen management ---------------- */
+  var currentScreen = 'home';
+  function showScreen(name){
+    currentScreen = name;
+    Object.keys(screens).forEach(function(key){
+      screens[key].classList.toggle('active', key === name);
+    });
+    homeBtn.classList.toggle('visible', name !== 'home');
+    if(name === 'home'){
+      refreshHomeBests();
+      startIdleScene();
+    }else{
+      stopIdleScene();
+    }
+    if(name !== 'game'){
+      stopGameLoop();
+    }
+  }
+  function goHome(){ showScreen('home'); }
+  homeBtn.addEventListener('click', goHome);
+
+  /* ---------------- Idle (5 min inactivity) timer ---------------- */
+  var idleTimer = null;
+  function resetIdleTimer(){
+    if(idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(function(){
+      if(currentScreen !== 'home') goHome();
+    }, IDLE_TIMEOUT);
+  }
+  ['keydown','mousedown','touchstart','click'].forEach(function(evt){
+    document.addEventListener(evt, resetIdleTimer, { passive:true });
+  });
+
+  /* ---------------- Drawing helpers ---------------- */
+  function rect(c,x,y,w,h,color){
+    c.fillStyle = color;
+    c.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h));
+  }
+  function drawX(c,x,y,size,color){
+    c.strokeStyle = color;
+    c.lineWidth = 2;
+    c.beginPath();
+    c.moveTo(x,y); c.lineTo(x+size,y+size);
+    c.moveTo(x+size,y); c.lineTo(x,y+size);
+    c.stroke();
+  }
+  function drawDino(c, x, groundY, jumpOffset, pose, legFrame, blink, dead, fg, bg){
+    var top = groundY - jumpOffset;
+    if(pose === 'duck'){
+      var dy = top - DUCK_H;
+      rect(c,x,dy+8,10,10,fg);            // tail
+      rect(c,x+4,dy+10,50,14,fg);         // long low body
+      rect(c,x+46,dy,18,12,fg);           // head
+      rect(c,x+62,dy+7,2,4,fg);           // snout tip
+      if(dead) drawX(c,x+53,dy+1,6,bg);
+      else if(!blink) rect(c,x+54,dy+2,4,4,bg); // eye
+      if(legFrame === 0){
+        rect(c,x+8,dy+24,10,4,fg);
+        rect(c,x+36,dy+24,10,4,fg);
+      }else{
+        rect(c,x+14,dy+24,10,4,fg);
+        rect(c,x+42,dy+24,10,4,fg);
+      }
+      return;
+    }
+    var y = top - DINO_H;
+    // tapered tail
+    rect(c,x,y+20,12,7,fg);
+    rect(c,x+4,y+27,6,5,fg);
+    // body
+    rect(c,x+10,y+14,24,18,fg);
+    // head (sits higher than body for the hunched silhouette)
+    rect(c,x+26,y,22,17,fg);
+    // snout / jaw
+    rect(c,x+45,y+10,3,6,fg);
+    // eye
+    if(dead) drawX(c,x+35,y+3,6,bg);
+    else if(!blink) rect(c,x+36,y+4,4,4,bg);
+    // arm
+    rect(c,x+24,y+26,6,8,fg);
+    // legs + feet
+    if(pose === 'jump'){
+      rect(c,x+14,y+34,10,12,fg);
+      rect(c,x+12,y+46,12,4,fg);
+      rect(c,x+28,y+34,10,12,fg);
+      rect(c,x+26,y+46,12,4,fg);
+    }else{
+      if(legFrame === 0){
+        rect(c,x+28,y+32,8,14,fg);
+        rect(c,x+26,y+46,12,4,fg);
+        rect(c,x+14,y+38,8,8,fg);
+        rect(c,x+12,y+46,12,4,fg);
+      }else{
+        rect(c,x+14,y+32,8,14,fg);
+        rect(c,x+12,y+46,12,4,fg);
+        rect(c,x+28,y+38,8,8,fg);
+        rect(c,x+26,y+46,12,4,fg);
+      }
+    }
+  }
+  function drawCactus(c,x,groundY,type,fg){
+    var y = groundY;
+    if(type === 'cactusSmall'){
+      rect(c,x+6,y-36,8,36,fg);           // main stalk
+      rect(c,x,y-22,6,5,fg);              // left branch
+      rect(c,x,y-28,4,7,fg);              // left branch riser
+      rect(c,x+14,y-15,4,5,fg);           // right branch
+      rect(c,x+15,y-21,3,7,fg);           // right branch riser
+    }else if(type === 'cactusLarge'){
+      rect(c,x+10,y-54,9,54,fg);          // main stalk
+      rect(c,x,y-36,10,6,fg);             // left branch
+      rect(c,x,y-46,5,11,fg);             // left branch riser
+      rect(c,x+19,y-24,8,6,fg);           // right branch
+      rect(c,x+20,y-34,4,11,fg);          // right branch riser
+    }else if(type === 'cactusGroup'){
+      drawCactus(c,x,groundY,'cactusSmall',fg);
+      drawCactus(c,x+15,groundY,'cactusSmall',fg);
+      drawCactus(c,x+30,groundY,'cactusSmall',fg);
+    }
+  }
+  function drawBird(c,x,groundY,fg,wingUp){
+    var y = groundY - BIRD_FLY_HEIGHT - BIRD_HEIGHT;
+    rect(c,x+10,y+7,14,6,fg);   // body
+    rect(c,x+22,y+5,8,5,fg);    // head
+    rect(c,x+30,y+6,3,3,fg);    // beak
+    c.fillStyle = fg;
+    if(wingUp){
+      c.beginPath();
+      c.moveTo(x,y+12); c.lineTo(x+6,y+2); c.lineTo(x+12,y+10); c.lineTo(x+18,y+0); c.lineTo(x+24,y+9); c.lineTo(x+24,y+13);
+      c.closePath(); c.fill();
+    }else{
+      c.beginPath();
+      c.moveTo(x,y+8); c.lineTo(x+6,y+18); c.lineTo(x+12,y+10); c.lineTo(x+18,y+20); c.lineTo(x+24,y+11); c.lineTo(x+24,y+7);
+      c.closePath(); c.fill();
+    }
+  }
+  function drawGround(c,groundY,offset,fg,width){
+    rect(c,0,groundY,width,2,fg);
+    for(var x = -(offset % 24); x < width; x += 24){
+      rect(c,x,groundY+3,10,2,fg);
+    }
+  }
+  function drawCloud(c,x,y,color){
+    rect(c,x,y,28,8,color);
+    rect(c,x+6,y-6,16,6,color);
+  }
+  function drawMoon(c,x,y,fg){
+    c.fillStyle = fg;
+    c.beginPath(); c.arc(x,y,10,0,Math.PI*2); c.fill();
+    c.globalCompositeOperation = 'destination-out';
+    c.beginPath(); c.arc(x+5,y-3,9,0,Math.PI*2); c.fill();
+    c.globalCompositeOperation = 'source-over';
+  }
+  function drawStar(c,x,y,fg){ rect(c,x,y,2,2,fg); }
+
+  /* ---------------- Game state ---------------- */
+  var game = null;
+  function createGame(level){
+    var cfg = DIFFICULTIES[level];
+    var stars = [];
+    for(var i=0;i<15;i++) stars.push({ x: Math.random()*600, y: Math.random()*100 });
+    return {
+      level: level, cfg: cfg,
+      speed: cfg.startSpeed,
+      distance: 0,
+      score: 0,
+      jumpOffset: 0,
+      velocityY: 0,
+      jumping: false,
+      ducking: false,
+      legFrame: 0, legTimer: 0,
+      wingFrame: 0, wingTimer: 0,
+      blink: false, blinkTimer: 0,
+      obstacles: [],
+      clouds: [],
+      stars: stars,
+      spawnTimer: 400,
+      cloudTimer: 0,
+      elapsed: 0,
+      era: 0,
+      night: false,
+      started: false,
+      over: false,
+      surpassedShown: false,
+      lastTs: null,
+      groundOffset: 0
+    };
+  }
+
+  var keys = { down:false };
+
+  function handleJump(){
+    if(!game || game.over) return;
+    if(!game.started){
+      game.started = true;
+      startHint.classList.add('hidden');
+    }
+    if(!game.jumping && game.jumpOffset === 0){
+      game.velocityY = JUMP_VELOCITY;
+      game.jumping = true;
+      game.ducking = false;
+    }
+  }
+
+  document.addEventListener('keydown', function(e){
+    if(currentScreen !== 'game') return;
+    if(e.code === 'Space' || e.code === 'ArrowUp'){
+      e.preventDefault();
+      handleJump();
+    }else if(e.code === 'ArrowDown'){
+      e.preventDefault();
+      keys.down = true;
+    }
+  });
+  document.addEventListener('keyup', function(e){
+    if(e.code === 'ArrowDown') keys.down = false;
+  });
+  canvas.addEventListener('mousedown', function(){
+    if(currentScreen === 'game') handleJump();
+  });
+  canvas.addEventListener('touchstart', function(e){
+    if(currentScreen === 'game'){ e.preventDefault(); handleJump(); }
+  }, { passive:false });
+
+  /* ---------------- Main loop ---------------- */
+  var rafId = null;
+  function beginGame(level){
+    game = createGame(level);
+    hudLevel.textContent = DIFFICULTIES[level].label.toUpperCase();
+    hudBest.textContent = highScores[level];
+    hudScore.textContent = '00000';
+    hudTime.textContent = '00:00';
+    surpassBanner.classList.remove('show');
+    goNewBest.classList.remove('show');
+    startHint.classList.remove('hidden');
+    canvasFrame.classList.remove('night');
+    showScreen('game');
+    if(rafId) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(loop);
+  }
+  function stopGameLoop(){
+    if(rafId){ cancelAnimationFrame(rafId); rafId = null; }
+  }
+  function loop(ts){
+    if(!game) return;
+    if(game.lastTs === null) game.lastTs = ts;
+    var dt = ts - game.lastTs;
+    game.lastTs = ts;
+    if(dt > 100) dt = 100;
+    var frames = dt / 16.6667;
+
+    render(game, frames, dt);
+
+    if(!game.over){
+      rafId = requestAnimationFrame(loop);
+    }
+  }
+
+  function spawnObstacle(g){
+    var cfg = g.cfg;
+    var type;
+    if(g.speed > cfg.startSpeed + 1 && Math.random() < cfg.birdChance){
+      type = 'bird';
+    }else{
+      var r = Math.random();
+      type = r < 0.45 ? 'cactusSmall' : (r < 0.8 ? 'cactusLarge' : 'cactusGroup');
+    }
+    var dims = OBSTACLE_DIMS[type];
+    g.obstacles.push({ type:type, x:600, w:dims.w, h:dims.h, kind:dims.kind });
+    g.spawnTimer = cfg.minGap + Math.random() * (cfg.maxGap - cfg.minGap);
+  }
+
+  function checkCollision(g){
+    var dinoW = g.ducking ? DUCK_W : DINO_W;
+    var dinoH = g.ducking ? DUCK_H : DINO_H;
+    var dinoBottom = g.jumpOffset;
+    var dinoTop = dinoBottom + dinoH;
+    var dinoLeft = DINO_X + 4;
+    var dinoRight = DINO_X + dinoW - 4;
+    var dTop = dinoTop - 4;
+    var dBottom = dinoBottom + 2;
+
+    for(var i=0;i<g.obstacles.length;i++){
+      var o = g.obstacles[i];
+      var obsLeft = o.x + 3;
+      var obsRight = o.x + o.w - 3;
+      var obsBottom, obsTop;
+      if(o.kind === 'ground'){
+        obsBottom = 0; obsTop = o.h - 3;
+      }else{
+        obsBottom = BIRD_FLY_HEIGHT + 3; obsTop = BIRD_FLY_HEIGHT + o.h - 3;
+      }
+      var xOverlap = dinoRight > obsLeft && dinoLeft < obsRight;
+      var yOverlap = dTop > obsBottom && obsTop > dBottom;
+      if(xOverlap && yOverlap) return true;
+    }
+    return false;
+  }
+
+  function formatTime(totalSeconds){
+    var m = Math.floor(totalSeconds/60);
+    var s = Math.floor(totalSeconds%60);
+    return (m<10?'0':'')+m+':'+(s<10?'0':'')+s;
+  }
+  function padScore(n){
+    var s = String(n);
+    while(s.length<5) s='0'+s;
+    return s;
+  }
+
+  var bannerTimeout = null;
+  function showSurpassBanner(){
+    surpassBanner.textContent = "You've passed your high score!";
+    surpassBanner.classList.add('show');
+    if(bannerTimeout) clearTimeout(bannerTimeout);
+    bannerTimeout = setTimeout(function(){ surpassBanner.classList.remove('show'); }, 3000);
+  }
+
+  function launchConfetti(){
+    var colors = ['#ff5a36','#ffb84c','#4cd07a','#4ca7ff','#b16cff','#ff6cab'];
+    for(var i=0;i<70;i++){
+      var el = document.createElement('div');
+      el.className = 'confetti';
+      el.style.left = (Math.random()*100)+'vw';
+      el.style.background = colors[Math.floor(Math.random()*colors.length)];
+      el.style.animationDuration = (2.5+Math.random()*1.5)+'s';
+      el.style.animationDelay = (Math.random()*0.4)+'s';
+      el.style.transform = 'rotate('+(Math.random()*360)+'deg)';
+      confettiLayer.appendChild(el);
+      (function(node){ setTimeout(function(){ node.remove(); }, 4500); })(el);
+    }
+  }
+
+  function endRun(g){
+    g.over = true;
+    g.jumping = false;
+    var isNewBest = false;
+    if(g.score > highScores[g.level]){
+      highScores[g.level] = g.score;
+      saveHighScores();
+      isNewBest = true;
+    }
+    goScore.textContent = padScore(g.score);
+    goBest.textContent = padScore(highScores[g.level]);
+    goTime.textContent = formatTime(g.elapsed/1000);
+    if(isNewBest){
+      goNewBest.classList.add('show');
+      launchConfetti();
+    }else{
+      goNewBest.classList.remove('show');
+    }
+    draw(g);
+    setTimeout(function(){ showScreen('gameover'); }, 350);
+  }
+
+  function render(g, frames, dt){
+    var cfg = g.cfg;
+    if(g.started && !g.over){
+      g.speed = Math.min(g.speed + cfg.accel*frames, cfg.maxSpeed);
+      g.distance += g.speed*frames;
+      g.elapsed += dt;
+
+      if(g.jumping){
+        g.velocityY -= GRAVITY*frames;
+        if(keys.down) g.velocityY -= FAST_DROP*frames;
+        g.jumpOffset += g.velocityY*frames;
+        if(g.jumpOffset <= 0){
+          g.jumpOffset = 0; g.velocityY = 0; g.jumping = false;
+        }
+      }
+      g.ducking = keys.down && !g.jumping;
+
+      g.legTimer += frames;
+      var legSpeed = Math.max(3, 8 - g.speed*0.4);
+      if(g.legTimer >= legSpeed){ g.legFrame = 1-g.legFrame; g.legTimer = 0; }
+      g.wingTimer += frames;
+      if(g.wingTimer >= 10){ g.wingFrame = 1-g.wingFrame; g.wingTimer = 0; }
+      g.blinkTimer += dt;
+      if(g.blinkTimer > 3000){
+        g.blink = true;
+        if(g.blinkTimer > 3150){ g.blink = false; g.blinkTimer = 0; }
+      }
+
+      g.groundOffset = (g.groundOffset + g.speed*frames) % 24;
+
+      g.cloudTimer -= frames;
+      if(g.cloudTimer <= 0){
+        g.clouds.push({ x:600, y:20+Math.random()*40 });
+        g.cloudTimer = 100+Math.random()*100;
+      }
+      for(var ci=0; ci<g.clouds.length; ci++){ g.clouds[ci].x -= g.speed*0.25*frames; }
+      g.clouds = g.clouds.filter(function(cl){ return cl.x > -40; });
+
+      g.spawnTimer -= g.speed*frames;
+      if(g.spawnTimer <= 0){
+        spawnObstacle(g);
+      }
+      for(var oi=0; oi<g.obstacles.length; oi++){ g.obstacles[oi].x -= g.speed*frames; }
+      g.obstacles = g.obstacles.filter(function(o){ return o.x > -60; });
+
+      var newScore = Math.floor(g.distance/10);
+      if(newScore !== g.score){
+        g.score = newScore;
+        hudScore.textContent = padScore(g.score);
+        if(!g.surpassedShown && highScores[g.level] > 0 && g.score > highScores[g.level]){
+          g.surpassedShown = true;
+          showSurpassBanner();
+        }
+        var era = Math.floor(g.score/700);
+        if(era !== g.era){
+          g.era = era;
+          g.night = !g.night;
+          canvasFrame.classList.toggle('night', g.night);
+        }
+      }
+      hudTime.textContent = formatTime(g.elapsed/1000);
+
+      if(checkCollision(g)){
+        endRun(g);
+        return;
+      }
+    }
+    draw(g);
+  }
+
+  function draw(g){
+    var fg = g.night ? '#f7f7f7' : '#535353';
+    var bg = g.night ? '#202028' : '#f7f7f7';
+    var cloudColor = g.night ? '#3a3a44' : '#d8d3c8';
+
+    ctx.fillStyle = bg;
+    ctx.fillRect(0,0,600,200);
+
+    if(g.night){
+      drawMoon(ctx,540,30,fg);
+      for(var si=0; si<g.stars.length; si++){ drawStar(ctx,g.stars[si].x,g.stars[si].y,fg); }
+    }else{
+      for(var cl2=0; cl2<g.clouds.length; cl2++){ drawCloud(ctx,g.clouds[cl2].x,g.clouds[cl2].y,cloudColor); }
+    }
+
+    drawGround(ctx,GROUND_Y,g.groundOffset,fg,600);
+
+    for(var i=0;i<g.obstacles.length;i++){
+      var o = g.obstacles[i];
+      if(o.kind === 'ground'){
+        drawCactus(ctx,o.x,GROUND_Y,o.type,fg);
+      }else{
+        drawBird(ctx,o.x,GROUND_Y,fg,g.wingFrame===0);
+      }
+    }
+
+    var pose = g.jumping ? 'jump' : (g.ducking ? 'duck' : 'run');
+    var legFrame = g.started ? g.legFrame : 0;
+    drawDino(ctx, DINO_X, GROUND_Y, g.jumpOffset, pose, legFrame, g.blink, g.over, fg, bg);
+  }
+
+  /* ---------------- Idle home-screen scene ---------------- */
+  var idleRaf = null;
+  function startIdleScene(){
+    var idleState = { legFrame:0, legTimer:0, blink:false, blinkTimer:0, cloud:{x:500,y:15} };
+    if(idleRaf) cancelAnimationFrame(idleRaf);
+    var last = null;
+    function loopIdle(ts){
+      if(last === null) last = ts;
+      var dt = ts - last; last = ts;
+      var frames = dt/16.6667;
+
+      idleState.legTimer += frames;
+      if(idleState.legTimer > 10){ idleState.legFrame = 1-idleState.legFrame; idleState.legTimer = 0; }
+      idleState.blinkTimer += dt;
+      if(idleState.blinkTimer > 2500){
+        idleState.blink = true;
+        if(idleState.blinkTimer > 2650){ idleState.blink = false; idleState.blinkTimer = 0; }
+      }
+      idleState.cloud.x -= 0.2*frames;
+      if(idleState.cloud.x < -40) idleState.cloud.x = 620;
+
+      idleCtx.fillStyle = '#f7f7f7';
+      idleCtx.fillRect(0,0,600,90);
+      drawCloud(idleCtx, idleState.cloud.x, idleState.cloud.y, '#d8d3c8');
+      drawGround(idleCtx, 78, 0, '#535353', 600);
+      drawDino(idleCtx, 30, 78, 0, 'run', idleState.legFrame, idleState.blink, false, '#535353', '#f7f7f7');
+
+      idleRaf = requestAnimationFrame(loopIdle);
+    }
+    idleRaf = requestAnimationFrame(loopIdle);
+  }
+  function stopIdleScene(){
+    if(idleRaf){ cancelAnimationFrame(idleRaf); idleRaf = null; }
+  }
+
+  /* ---------------- Wiring ---------------- */
+  var levelCards = document.querySelectorAll('.level-card');
+  for(var lc=0; lc<levelCards.length; lc++){
+    levelCards[lc].addEventListener('click', function(){
+      beginGame(this.dataset.level);
+    });
+  }
+  document.getElementById('btn-instructions').addEventListener('click', function(){
+    showScreen('instructions');
+  });
+  document.getElementById('btn-retry').addEventListener('click', function(){
+    beginGame(game.level);
+  });
+
+  /* ---------------- Init ---------------- */
+  loadHighScores();
+  resetIdleTimer();
+  showScreen('home');
+})();
+</script>
+</body>
+</html>
